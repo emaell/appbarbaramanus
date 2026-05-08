@@ -18,11 +18,17 @@ function getInitialTab() {
 }
 
 function getMaterialAccent(category: string) {
-  if (category.includes('Caderneta')) return 'from-violet-50 to-purple-50 text-violet-700';
-  if (category.includes('BLW') || category.includes('Introdução')) return 'from-amber-50 to-orange-50 text-orange-700';
-  if (category.includes('Sono')) return 'from-indigo-50 to-blue-50 text-blue-700';
-  if (category.includes('Desenvolvimento')) return 'from-emerald-50 to-green-50 text-emerald-700';
-  return 'from-pink-50 to-rose-50 text-primary';
+  if (category.includes('Caderneta')) return 'from-[#F6F0FF] to-[#F3ECFF] text-[#6E5794]';
+  if (category.includes('BLW') || category.includes('Introdução')) return 'from-[#FFF4E3] to-[#FFEBDD] text-[#A9623F]';
+  if (category.includes('Sono')) return 'from-[#EEF5FF] to-[#EAF2FF] text-[#57749A]';
+  if (category.includes('Desenvolvimento')) return 'from-[#EFFAEF] to-[#EAF7EF] text-[#4D8763]';
+  return 'from-[#FCEAE5] to-[#FFF6F2] text-[#C96B56]';
+}
+
+function filterChipClass(isActive: boolean) {
+  return isActive
+    ? 'shrink-0 rounded-full border-0 bg-[#FCEAE5] font-bold text-[#C96B56] shadow-sm hover:bg-[#F8DCD5]'
+    : 'shrink-0 rounded-full border-0 bg-[#F5F0EC] font-bold text-[#8B7264] hover:bg-[#EEE7E1]';
 }
 
 export default function Content() {
@@ -95,9 +101,9 @@ export default function Content() {
                 <Input placeholder="Buscar por BLW, sono, caderneta, desenvolvimento..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-12 rounded-2xl bg-white pl-11" />
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1">
-                <Button variant={!selectedCategory ? 'default' : 'outline'} size="sm" className="shrink-0 rounded-full" onClick={() => setSelectedCategory(null)}>Todos</Button>
+                <Button variant="outline" size="sm" className={filterChipClass(!selectedCategory)} onClick={() => setSelectedCategory(null)}>Todos</Button>
                 {materialCategories.map((category) => (
-                  <Button key={category} variant={selectedCategory === category ? 'default' : 'outline'} size="sm" className="shrink-0 rounded-full" onClick={() => setSelectedCategory(category)}>
+                  <Button key={category} variant="outline" size="sm" className={filterChipClass(selectedCategory === category)} onClick={() => setSelectedCategory(category)}>
                     {category}
                   </Button>
                 ))}
@@ -114,12 +120,12 @@ export default function Content() {
                         <span className="rounded-full bg-white/85 px-3 py-1 text-xs font-bold shadow-sm">{material.category}</span>
                         <BookOpen className="opacity-70" />
                       </div>
-                      <h3 className="line-clamp-2 text-2xl font-black leading-tight text-[#33423a]">{material.title}</h3>
+                      <h3 className="line-clamp-2 text-2xl font-black leading-tight text-[#3D2C22]">{material.title}</h3>
                     </div>
                     <div className="space-y-4 p-5">
                       <p className="line-clamp-3 text-sm text-muted-foreground">{material.description}</p>
                       {material.ageIndicationMonths && (
-                        <span className="inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+                        <span className="inline-flex rounded-full bg-[#EEF5FF] px-3 py-1 text-xs font-semibold text-[#57749A]">
                           {material.ageIndicationMonths.min === 0 && material.ageIndicationMonths.max === 0
                             ? 'Gestação / pré-natal'
                             : `${material.ageIndicationMonths.min}-${material.ageIndicationMonths.max} meses`}
@@ -148,7 +154,7 @@ export default function Content() {
           <TabsContent value="videos" className="space-y-4 pt-3">
             {selectedVideo ? (
               <Card className="overflow-hidden p-0">
-                <div className="aspect-video bg-black">
+                <div className="aspect-video bg-[#1A1410]">
                   {selectedVideo.videoUrl ? (
                     isLocalVideo ? (
                       <video controls src={selectedVideo.videoUrl} poster={selectedVideo.thumbnailUrl} className="h-full w-full" />
@@ -156,7 +162,7 @@ export default function Content() {
                       <iframe src={selectedVideo.videoUrl} title={selectedVideo.title} className="h-full w-full" allowFullScreen />
                     )
                   ) : (
-                    <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-[#392735] to-[#182e28] p-8 text-center text-white">
+                    <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-[#3D2C22] to-[#1A1410] p-8 text-center text-white">
                       <Play className="mb-3" size={44} />
                       <h3 className="text-xl font-bold">Arquivo de vídeo pendente</h3>
                       <p className="mt-2 max-w-md text-sm text-white/75">O card está pronto. Adicione o MP4 em /client/public/assets/videos para ativar o player local.</p>
@@ -187,7 +193,7 @@ export default function Content() {
                           {!video.videoUrl && <span className="absolute left-3 top-3 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">MP4 pendente</span>}
                         </div>
                         <div className="p-5">
-                          <span className="medical-chip">{video.category}</span>
+                          <span className="rounded-full bg-[#FCEAE5] px-3 py-1 text-xs font-bold text-[#C96B56]">{video.category}</span>
                           <h3 className="mt-3 text-xl font-black">{video.title}</h3>
                           <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{video.description}</p>
                         </div>
@@ -238,9 +244,9 @@ export default function Content() {
                 <Input placeholder="Buscar dúvida..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-12 rounded-2xl bg-white pl-11" />
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1">
-                <Button variant={!selectedCategory ? 'default' : 'outline'} size="sm" className="shrink-0 rounded-full" onClick={() => setSelectedCategory(null)}>Todas</Button>
+                <Button variant="outline" size="sm" className={filterChipClass(!selectedCategory)} onClick={() => setSelectedCategory(null)}>Todas</Button>
                 {faqCategories.map((category) => (
-                  <Button key={category} variant={selectedCategory === category ? 'default' : 'outline'} size="sm" className="shrink-0 rounded-full" onClick={() => setSelectedCategory(category)}>{category}</Button>
+                  <Button key={category} variant="outline" size="sm" className={filterChipClass(selectedCategory === category)} onClick={() => setSelectedCategory(category)}>{category}</Button>
                 ))}
               </div>
             </div>
