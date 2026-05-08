@@ -1,78 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus, Clock, Droplets, Moon, AlertCircle, Utensils, FileText, Activity, Play, Pause, RotateCcw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { useActiveChild } from '@/contexts/ActiveChildContext';
 import { useNotification } from '@/contexts/NotificationContext';
+import { Activity, AlertCircle, Baby, Clock, FileText, HeartPulse, Moon, Pause, Play, Plus, RotateCcw, Thermometer, Utensils } from 'lucide-react';
 import * as storage from '@/lib/storage';
-import type { FeedingSession, DiaperEntry, SleepEntry, SymptomEntry, GeneralNote } from '@shared/types';
+import type { DiaperEntry, FeedingSession, GeneralNote, SleepEntry, SymptomEntry } from '@shared/types';
+
+function getInitialTab() {
+  if (typeof window === 'undefined') return 'feeding';
+  return new URLSearchParams(window.location.search).get('tab') || 'feeding';
+}
+
+function formatClock(timestamp?: number) {
+  if (!timestamp) return 'Sem registro';
+  return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
+}
+
+function formatTimer(seconds: number) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+const demoTimeline = [
+  { time: '14:30', title: 'Mamada', detail: '12 min · seio esquerdo' },
+  { time: '15:10', title: 'Fralda', detail: 'Xixi registrado' },
+  { time: '16:20', title: 'Sono', detail: 'Cochilo de 45 min' },
+];
 
 export default function Diary() {
   const { activeChild } = useActiveChild();
   const { addNotification } = useNotification();
-  const [activeTab, setActiveTab] = useState('feeding');
-  
-  // Aleitamento
+  const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState(getInitialTab());
   const [feedingSessions, setFeedingSessions] = useState<FeedingSession[]>([]);
+  const [diaperEntries, setDiaperEntries] = useState<DiaperEntry[]>([]);
+  const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
+  const [symptomEntries, setSymptomEntries] = useState<SymptomEntry[]>([]);
+  const [notes, setNotes] = useState<GeneralNote[]>([]);
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
-  const [feedingForm, setFeedingForm] = useState({
-    rightBreast: false,
-    leftBreast: false,
-    pegQuality: 'good' as 'good' | 'difficult' | 'painful' | 'unknown',
-    maternalPain: false,
-    babyContent: 'yes' as 'yes' | 'no' | 'unknown',
-    notes: '',
-  });
-
-  // Fraldas
-  const [diaperEntries, setDiaperEntries] = useState<DiaperEntry[]>([]);
-  const [diaperForm, setDiaperForm] = useState({
-    type: 'wet' as 'wet' | 'poop' | 'both',
-    stoolAppearance: ['yellow'] as any[],
-    notes: '',
-  });
-
-  // Sono
-  const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
-  const [sleepForm, setSleepForm] = useState({
-    startTime: Date.now(),
-    endTime: Date.now(),
-    awakenings: 0,
-    naps: 0,
-    notes: '',
-  });
-
-  // Sintomas
-  const [symptomEntries, setSymptomEntries] = useState<SymptomEntry[]>([]);
-  const [symptomForm, setSymptomForm] = useState({
-    type: 'fever' as any,
-    severity: 'mild' as 'mild' | 'moderate' | 'severe',
-    notes: '',
-  });
-
-  // Observações
-  const [notes, setNotes] = useState<GeneralNote[]>([]);
+  const [feedingForm, setFeedingForm] = useState({ rightBreast: false, leftBreast: false, notes: '' });
+  const [diaperForm, setDiaperForm] = useState({ type: 'wet' as 'wet' | 'poop' | 'both', notes: '' });
+  const [sleepForm, setSleepForm] = useState({ awakenings: 0, naps: 1, notes: '' });
+  const [symptomForm, setSymptomForm] = useState({ symptomType: 'fever' as any, intensity: 'mild' as 'mild' | 'moderate' | 'severe', notes: '' });
   const [noteText, setNoteText] = useState('');
 
-  // Carregar dados ao montar
   useEffect(() => {
     if (!activeChild) return;
     loadData();
   }, [activeChild]);
 
-  // Timer
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (timerRunning) {
-      interval = setInterval(() => {
-        setTimerSeconds(s => s + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
+    if (!timerRunning) return;
+    const interval = window.setInterval(() => setTimerSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(interval);
   }, [timerRunning]);
 
   const loadData = async () => {
@@ -91,176 +78,97 @@ export default function Diary() {
     setNotes(allNotes);
   };
 
-  const handleSaveFeeding = async () => {
-    if (!activeChild || (!feedingForm.rightBreast && !feedingForm.leftBreast)) {
-      alert('Selecione pelo menos um seio');
+  const todaySummary = useMemo(() => ({
+    feedings: feedingSessions.length,
+    diapers: diaperEntries.length,
+    naps: sleepEntries.reduce((total, item) => total + (item.naps || 0), 0),
+    symptoms: symptomEntries.length,
+  }), [feedingSessions, diaperEntries, sleepEntries, symptomEntries]);
+
+  const saveFeeding = async () => {
+    if (!activeChild) return;
+    if (!feedingForm.rightBreast && !feedingForm.leftBreast) {
+      alert('Selecione pelo menos um lado da mamada.');
       return;
     }
-
-    const session: FeedingSession = {
-      id: `feeding-${Date.now()}`,
+    const now = Date.now();
+    await storage.addFeedingSession({
+      id: `feeding-${now}`,
       childId: activeChild.id,
       date: new Date().setHours(0, 0, 0, 0),
-      startTime: Date.now() - (timerSeconds * 1000),
-      endTime: Date.now(),
-      durationMinutes: timerSeconds / 60,
+      startTime: now - timerSeconds * 1000,
+      endTime: now,
+      durationMinutes: Math.max(1, Math.round(timerSeconds / 60)),
       rightBreast: feedingForm.rightBreast,
       leftBreast: feedingForm.leftBreast,
-      pegQuality: feedingForm.pegQuality,
-      maternalPain: feedingForm.maternalPain,
-      babyContent: feedingForm.babyContent,
-      notes: feedingForm.notes,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    await storage.addFeedingSession(session);
-    await loadData();
-    setTimerSeconds(0);
-    setTimerRunning(false);
-    setFeedingForm({
-      rightBreast: false,
-      leftBreast: false,
-      pegQuality: 'good',
+      pegQuality: 'unknown',
       maternalPain: false,
-      babyContent: 'yes',
-      notes: '',
+      babyContent: 'unknown',
+      notes: feedingForm.notes,
+      createdAt: now,
+      updatedAt: now,
     });
-    
-    addNotification({
-      type: 'success',
-      title: '✓ Mamada registrada',
-      message: `Duração: ${Math.round(timerSeconds / 60)} minutos`,
-      duration: 4000,
-    });
+    setTimerRunning(false);
+    setTimerSeconds(0);
+    setFeedingForm({ rightBreast: false, leftBreast: false, notes: '' });
+    await loadData();
+    addNotification({ type: 'success', title: 'Mamada registrada', message: 'Registro salvo neste dispositivo.', duration: 3500 });
   };
 
-  const handleSaveDiaper = async () => {
+  const saveDiaper = async () => {
     if (!activeChild) return;
-
-    const entry: DiaperEntry = {
-      id: `diaper-${Date.now()}`,
-      childId: activeChild.id,
-      date: new Date().setHours(0, 0, 0, 0),
-      time: Date.now(),
-      type: diaperForm.type,
-      stoolAppearance: diaperForm.stoolAppearance,
-      notes: diaperForm.notes,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    await storage.addDiaperEntry(entry);
+    const now = Date.now();
+    await storage.addDiaperEntry({ id: `diaper-${now}`, childId: activeChild.id, date: new Date().setHours(0, 0, 0, 0), time: now, type: diaperForm.type, notes: diaperForm.notes, createdAt: now, updatedAt: now });
+    setDiaperForm({ type: 'wet', notes: '' });
     await loadData();
-    setDiaperForm({ type: 'wet', stoolAppearance: ['yellow'], notes: '' });
-    
-    const typeLabel = diaperForm.type === 'wet' ? 'Xixi' : diaperForm.type === 'poop' ? 'Cocô' : 'Xixi e Cocô';
-    addNotification({
-      type: 'success',
-      title: '✓ Fralda registrada',
-      message: `${typeLabel} registrado com sucesso`,
-      duration: 4000,
-    });
+    addNotification({ type: 'success', title: 'Fralda registrada', message: 'Troca salva no diário.', duration: 3000 });
   };
 
-  const handleSaveSleep = async () => {
-    if (!activeChild) {
-      alert('Selecione uma criança');
-      return;
-    }
-
-    const entry: SleepEntry = {
-      id: `sleep-${Date.now()}`,
-      childId: activeChild.id,
-      date: new Date().setHours(0, 0, 0, 0),
-      startTime: sleepForm.startTime,
-      endTime: sleepForm.endTime,
-      awakenings: sleepForm.awakenings,
-      naps: sleepForm.naps,
-      notes: sleepForm.notes,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    await storage.addSleepEntry(entry);
-    await loadData();
-    setSleepForm({ startTime: Date.now(), endTime: Date.now(), awakenings: 0, naps: 0, notes: '' });
-    
-    const sleepDurationMinutes = (sleepForm.endTime - sleepForm.startTime) / 60000;
-    addNotification({
-      type: 'success',
-      title: '✓ Sono registrado',
-      message: `${Math.round(sleepDurationMinutes)} minutos de sono registrados`,
-      duration: 4000,
-    });
-  };
-
-  const handleSaveSymptom = async () => {
+  const saveSleep = async () => {
     if (!activeChild) return;
-
-    const entry: SymptomEntry = {
-      id: `symptom-${Date.now()}`,
-      childId: activeChild.id,
-      date: new Date().setHours(0, 0, 0, 0),
-      startTime: Date.now(),
-      symptomType: symptomForm.type as any,
-      intensity: symptomForm.severity,
-      notes: symptomForm.notes,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    await storage.addSymptomEntry(entry);
+    const now = Date.now();
+    await storage.addSleepEntry({ id: `sleep-${now}`, childId: activeChild.id, date: new Date().setHours(0, 0, 0, 0), startTime: now - 45 * 60000, endTime: now, awakenings: sleepForm.awakenings, naps: sleepForm.naps, notes: sleepForm.notes, createdAt: now, updatedAt: now });
+    setSleepForm({ awakenings: 0, naps: 1, notes: '' });
     await loadData();
-    setSymptomForm({ type: 'fever', severity: 'mild', notes: '' });
-    
-    const severityLabel = symptomForm.severity === 'mild' ? 'leve' : symptomForm.severity === 'moderate' ? 'moderada' : 'grave';
-    addNotification({
-      type: symptomForm.severity === 'severe' ? 'warning' : 'info',
-      title: '✓ Sintoma registrado',
-      message: `Sintoma ${severityLabel} registrado. Monitore o bebê.`,
-      duration: 5000,
-    });
+    addNotification({ type: 'success', title: 'Sono registrado', message: 'Cochilo/sono salvo no diário.', duration: 3000 });
   };
 
-  const handleSaveNote = async () => {
-    if (!activeChild || !noteText.trim()) {
-      alert('Escreva uma observação');
-      return;
-    }
-
-    const note: GeneralNote = {
-      id: `note-${Date.now()}`,
-      childId: activeChild.id,
-      date: new Date().setHours(0, 0, 0, 0),
-      content: noteText,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    await storage.addGeneralNote(note);
+  const saveSymptom = async () => {
+    if (!activeChild) return;
+    const now = Date.now();
+    await storage.addSymptomEntry({ id: `symptom-${now}`, childId: activeChild.id, date: new Date().setHours(0, 0, 0, 0), startTime: now, symptomType: symptomForm.symptomType, intensity: symptomForm.intensity, notes: symptomForm.notes, createdAt: now, updatedAt: now });
+    setSymptomForm({ symptomType: 'fever', intensity: 'mild', notes: '' });
     await loadData();
+    addNotification({ type: symptomForm.intensity === 'severe' ? 'warning' : 'info', title: 'Sintoma registrado', message: 'Monitore e procure atendimento se houver piora.', duration: 4500 });
+  };
+
+  const saveNote = async () => {
+    if (!activeChild || !noteText.trim()) return;
+    const now = Date.now();
+    await storage.addGeneralNote({ id: `note-${now}`, childId: activeChild.id, date: new Date().setHours(0, 0, 0, 0), content: noteText, createdAt: now, updatedAt: now });
     setNoteText('');
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    await loadData();
   };
 
   if (!activeChild) {
     return (
       <AppLayout>
-        <div className="container py-8">
-          <Card className="p-6 text-center">
-            <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Selecione uma criança para registrar atividades</p>
-          </Card>
+        <div className="container space-y-5 py-5">
+          <section className="glass-card bg-gradient-to-br from-[#FCEAE5] via-white to-[#EAF7EF] p-5">
+            <span className="medical-chip">Diário do bebê</span>
+            <h1 className="mt-4 text-3xl font-black leading-tight text-[#3D2C22]">Registre a rotina com poucos toques</h1>
+            <p className="mt-2 text-sm leading-relaxed text-[#6F5B50]">Cadastre uma criança para salvar mamadas, fraldas, sono, sintomas e observações neste dispositivo.</p>
+            <Button className="mt-5 w-full rounded-2xl py-6" onClick={() => navigate('/profile')}><Plus className="mr-2" />Cadastrar criança</Button>
+          </section>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              ['Mamada', '14h30', Baby],
+              ['Sono', '2 cochilos', Moon],
+              ['Fraldas', '4 trocas', HeartPulse],
+              ['Temperatura', '36,7 °C', Thermometer],
+            ].map(([title, value, Icon]: any) => <Card key={title} className="p-4"><Icon className="mb-2 text-primary" /><p className="text-xs font-bold uppercase text-muted-foreground">{title}</p><p className="mt-1 text-lg font-black text-[#3D2C22]">{value}</p><p className="text-xs text-muted-foreground">exemplo</p></Card>)}
+          </div>
+          <Card className="p-4"><h2 className="font-black text-[#3D2C22]">Linha do tempo exemplo</h2><div className="mt-3 space-y-3">{demoTimeline.map((item) => <div key={item.time} className="flex gap-3"><span className="rounded-full bg-[#F5F0EC] px-3 py-1 text-xs font-bold text-[#8B7264]">{item.time}</span><div><p className="font-bold text-[#3D2C22]">{item.title}</p><p className="text-sm text-muted-foreground">{item.detail}</p></div></div>)}</div></Card>
         </div>
       </AppLayout>
     );
@@ -268,213 +176,46 @@ export default function Diary() {
 
   return (
     <AppLayout>
-      <div className="container py-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Diário de {activeChild.name}</h1>
-          <p className="text-muted-foreground">Registre as atividades diárias da criança</p>
-        </div>
+      <div className="container space-y-5 py-5 sm:py-6">
+        <section className="glass-card bg-gradient-to-br from-[#FCEAE5] via-white to-[#EAF7EF] p-5 sm:p-7">
+          <span className="medical-chip">Diário</span>
+          <h1 className="mt-3 text-3xl font-black text-[#3D2C22]">Diário de {activeChild.name}</h1>
+          <p className="mt-2 text-sm text-[#6F5B50]">Registre a rotina do dia e leve informações mais organizadas para a consulta.</p>
+          <div className="mt-5 grid grid-cols-4 gap-2">
+            <Card className="p-3 text-center"><p className="text-xl font-black text-[#3D2C22]">{todaySummary.feedings}</p><p className="text-[11px] text-muted-foreground">mamadas</p></Card>
+            <Card className="p-3 text-center"><p className="text-xl font-black text-[#3D2C22]">{todaySummary.diapers}</p><p className="text-[11px] text-muted-foreground">fraldas</p></Card>
+            <Card className="p-3 text-center"><p className="text-xl font-black text-[#3D2C22]">{todaySummary.naps}</p><p className="text-[11px] text-muted-foreground">cochilos</p></Card>
+            <Card className="p-3 text-center"><p className="text-xl font-black text-[#3D2C22]">{todaySummary.symptoms}</p><p className="text-[11px] text-muted-foreground">sintomas</p></Card>
+          </div>
+        </section>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
-            <TabsTrigger value="feeding" className="text-xs">
-              <Droplets size={16} className="mr-1" />
-              <span className="hidden sm:inline">Mamada</span>
-            </TabsTrigger>
-            <TabsTrigger value="diaper" className="text-xs">
-              <Activity size={16} className="mr-1" />
-              <span className="hidden sm:inline">Fralda</span>
-            </TabsTrigger>
-            <TabsTrigger value="sleep" className="text-xs">
-              <Moon size={16} className="mr-1" />
-              <span className="hidden sm:inline">Sono</span>
-            </TabsTrigger>
-            <TabsTrigger value="symptoms" className="text-xs">
-              <AlertCircle size={16} className="mr-1" />
-              <span className="hidden sm:inline">Sintoma</span>
-            </TabsTrigger>
-            <TabsTrigger value="digestive" className="text-xs">
-              <Utensils size={16} className="mr-1" />
-              <span className="hidden sm:inline">Gastro</span>
-            </TabsTrigger>
-            <TabsTrigger value="notes" className="text-xs">
-              <FileText size={16} className="mr-1" />
-              <span className="hidden sm:inline">Notas</span>
-            </TabsTrigger>
+          <TabsList className="grid h-auto w-full grid-cols-3 rounded-[1.4rem] bg-white/80 p-1 shadow-sm sm:grid-cols-6">
+            <TabsTrigger value="feeding" className="rounded-2xl py-3 text-xs"><Baby size={15} className="mr-1" />Mamada</TabsTrigger>
+            <TabsTrigger value="diaper" className="rounded-2xl py-3 text-xs"><HeartPulse size={15} className="mr-1" />Fralda</TabsTrigger>
+            <TabsTrigger value="sleep" className="rounded-2xl py-3 text-xs"><Moon size={15} className="mr-1" />Sono</TabsTrigger>
+            <TabsTrigger value="symptoms" className="rounded-2xl py-3 text-xs"><AlertCircle size={15} className="mr-1" />Sintoma</TabsTrigger>
+            <TabsTrigger value="digestive" className="rounded-2xl py-3 text-xs"><Utensils size={15} className="mr-1" />Gastro</TabsTrigger>
+            <TabsTrigger value="notes" className="rounded-2xl py-3 text-xs"><FileText size={15} className="mr-1" />Notas</TabsTrigger>
           </TabsList>
 
-          {/* Aleitamento */}
-          <TabsContent value="feeding" className="space-y-4">
-            <Card className="p-6 bg-primary/5">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Clock size={20} className="text-primary" />
-                Cronômetro de Mamada
-              </h3>
-              <div className="text-center mb-4">
-                <div className="text-4xl font-mono font-bold text-primary mb-4 p-4 bg-white rounded-lg">{formatTime(timerSeconds)}</div>
-                <div className="flex gap-2 justify-center">
-                  <Button
-                    className="bg-primary hover:bg-primary/90"
-                    onClick={() => setTimerRunning(!timerRunning)}
-                  >
-                    {timerRunning ? <Pause size={20} className="mr-2" /> : <Play size={20} className="mr-2" />}
-                    {timerRunning ? 'Pausar' : 'Iniciar'}
-                  </Button>
-                  <Button variant="outline" onClick={() => { setTimerSeconds(0); setTimerRunning(false); }}>
-                    <RotateCcw size={20} />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-3 mb-4">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={feedingForm.rightBreast} onChange={(e) => setFeedingForm({ ...feedingForm, rightBreast: e.target.checked })} />
-                  <span>Seio direito</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={feedingForm.leftBreast} onChange={(e) => setFeedingForm({ ...feedingForm, leftBreast: e.target.checked })} />
-                  <span>Seio esquerdo</span>
-                </label>
-              </div>
-              <select className="w-full px-3 py-2 border rounded-md mb-3" value={feedingForm.pegQuality} onChange={(e) => setFeedingForm({ ...feedingForm, pegQuality: e.target.value as any })}>
-                <option value="good">Pega boa</option>
-                <option value="difficult">Pega difícil</option>
-                <option value="painful">Pega dolorosa</option>
-                <option value="unknown">Não sei</option>
-              </select>
-              <label className="flex items-center gap-2 mb-3">
-                <input type="checkbox" checked={feedingForm.maternalPain} onChange={(e) => setFeedingForm({ ...feedingForm, maternalPain: e.target.checked })} />
-                <span>Dor materna</span>
-              </label>
-              <textarea className="w-full px-3 py-2 border rounded-md mb-4" placeholder="Observações..." value={feedingForm.notes} onChange={(e) => setFeedingForm({ ...feedingForm, notes: e.target.value })} rows={2} />
-              <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleSaveFeeding}>
-                <Plus size={20} className="mr-2" />
-                Salvar Mamada
-              </Button>
-            </Card>
+          <TabsContent value="feeding" className="space-y-4 pt-4"><Card className="space-y-4 p-5"><div className="text-center"><p className="subtle-label">Cronômetro</p><div className="mt-2 rounded-[1.5rem] bg-white p-5 text-5xl font-black text-primary shadow-inner">{formatTimer(timerSeconds)}</div><div className="mt-3 flex justify-center gap-2"><Button onClick={() => setTimerRunning(!timerRunning)}>{timerRunning ? <Pause className="mr-2" /> : <Play className="mr-2" />}{timerRunning ? 'Pausar' : 'Iniciar'}</Button><Button variant="outline" onClick={() => { setTimerSeconds(0); setTimerRunning(false); }}><RotateCcw /></Button></div></div><div className="grid grid-cols-2 gap-2"><Button variant={feedingForm.leftBreast ? 'default' : 'outline'} onClick={() => setFeedingForm({ ...feedingForm, leftBreast: !feedingForm.leftBreast })}>Esquerdo</Button><Button variant={feedingForm.rightBreast ? 'default' : 'outline'} onClick={() => setFeedingForm({ ...feedingForm, rightBreast: !feedingForm.rightBreast })}>Direito</Button></div><textarea className="min-h-20 w-full rounded-2xl border border-border px-3 py-2 text-sm" placeholder="Observações sobre pega, dor ou satisfação..." value={feedingForm.notes} onChange={(e) => setFeedingForm({ ...feedingForm, notes: e.target.value })} /><Button className="w-full rounded-2xl py-6" onClick={saveFeeding}>Salvar mamada</Button></Card><LastList title="Últimas mamadas" items={feedingSessions.slice(0, 3).map((item) => ({ time: formatClock(item.startTime), title: `${Math.round(item.durationMinutes || 0)} min`, detail: item.notes || 'Sem observações' }))} /></TabsContent>
 
-            {feedingSessions.length > 0 && (
-              <Card className="p-4">
-                <h4 className="font-semibold mb-3">Registros de Hoje</h4>
-                {feedingSessions.slice(-3).map((session) => (
-                  <div key={session.id} className="flex justify-between items-center p-2 bg-muted rounded mb-2">
-                    <span className="text-sm">{formatDate(session.startTime)} - {Math.round(session.durationMinutes || 0)} min</span>
-                  </div>
-                ))}
-              </Card>
-            )}
-          </TabsContent>
+          <TabsContent value="diaper" className="space-y-4 pt-4"><Card className="space-y-4 p-5"><div className="grid grid-cols-3 gap-2"><Button variant={diaperForm.type === 'wet' ? 'default' : 'outline'} onClick={() => setDiaperForm({ ...diaperForm, type: 'wet' })}>Xixi</Button><Button variant={diaperForm.type === 'poop' ? 'default' : 'outline'} onClick={() => setDiaperForm({ ...diaperForm, type: 'poop' })}>Cocô</Button><Button variant={diaperForm.type === 'both' ? 'default' : 'outline'} onClick={() => setDiaperForm({ ...diaperForm, type: 'both' })}>Ambos</Button></div><Input placeholder="Observações da fralda..." value={diaperForm.notes} onChange={(e) => setDiaperForm({ ...diaperForm, notes: e.target.value })} /><Button className="w-full rounded-2xl py-6" onClick={saveDiaper}>Salvar fralda</Button></Card><LastList title="Últimas fraldas" items={diaperEntries.slice(0, 3).map((item) => ({ time: formatClock(item.time), title: item.type === 'wet' ? 'Xixi' : item.type === 'poop' ? 'Cocô' : 'Xixi e cocô', detail: item.notes || 'Sem observações' }))} /></TabsContent>
 
-          {/* Fraldas */}
-          <TabsContent value="diaper" className="space-y-4">
-            <Card className="p-4 space-y-4">
-              <select className="w-full px-3 py-2 border rounded-md" value={diaperForm.type} onChange={(e) => setDiaperForm({ ...diaperForm, type: e.target.value as any })}>
-                <option value="wet">Xixi</option>
-                <option value="poop">Cocô</option>
-                <option value="both">Xixi e Cocô</option>
-              </select>
-              <select className="w-full px-3 py-2 border rounded-md" value={diaperForm.stoolAppearance?.[0] || 'yellow'} onChange={(e) => setDiaperForm({ ...diaperForm, stoolAppearance: [e.target.value as any] })}>
-                <option value="yellow">Amarelo</option>
-                <option value="greenish">Esverdeado</option>
-                <option value="brown">Marrom</option>
-                <option value="hard">Duro</option>
-                <option value="liquid">Líquido</option>
-                <option value="mucus">Com muco</option>
-                <option value="blood">Com sangue</option>
-              </select>
-              <textarea className="w-full px-3 py-2 border rounded-md" placeholder="Observações..." value={diaperForm.notes} onChange={(e) => setDiaperForm({ ...diaperForm, notes: e.target.value })} rows={3} />
-              <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleSaveDiaper}>
-                <Plus size={20} className="mr-2" />
-                Registrar Fralda
-              </Button>
-            </Card>
-          </TabsContent>
+          <TabsContent value="sleep" className="space-y-4 pt-4"><Card className="space-y-4 p-5"><div className="grid grid-cols-2 gap-3"><label className="text-sm font-bold">Cochilos<Input type="number" value={sleepForm.naps} onChange={(e) => setSleepForm({ ...sleepForm, naps: Number(e.target.value) })} /></label><label className="text-sm font-bold">Despertares<Input type="number" value={sleepForm.awakenings} onChange={(e) => setSleepForm({ ...sleepForm, awakenings: Number(e.target.value) })} /></label></div><Input placeholder="Observações do sono..." value={sleepForm.notes} onChange={(e) => setSleepForm({ ...sleepForm, notes: e.target.value })} /><Button className="w-full rounded-2xl py-6" onClick={saveSleep}>Salvar sono</Button></Card><LastList title="Últimos sonos" items={sleepEntries.slice(0, 3).map((item) => ({ time: formatClock(item.endTime), title: `${item.naps} cochilo(s)`, detail: item.notes || `${item.awakenings} despertar(es)` }))} /></TabsContent>
 
-          {/* Sono */}
-          <TabsContent value="sleep" className="space-y-4">
-            <Card className="p-4 space-y-4">
-              <div>
-                <label className="text-sm font-semibold">Início do sono</label>
-                <Input type="datetime-local" value={new Date(sleepForm.startTime).toISOString().slice(0, 16)} onChange={(e) => setSleepForm({ ...sleepForm, startTime: new Date(e.target.value).getTime() })} />
-              </div>
-              <div>
-                <label className="text-sm font-semibold">Fim do sono</label>
-                <Input type="datetime-local" value={new Date(sleepForm.endTime).toISOString().slice(0, 16)} onChange={(e) => setSleepForm({ ...sleepForm, endTime: new Date(e.target.value).getTime() })} />
-              </div>
-              <div>
-                <label className="text-sm font-semibold">Despertares</label>
-                <Input type="number" value={sleepForm.awakenings} onChange={(e) => setSleepForm({ ...sleepForm, awakenings: parseInt(e.target.value) || 0 })} min="0" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold">Cochilos</label>
-                <Input type="number" value={sleepForm.naps} onChange={(e) => setSleepForm({ ...sleepForm, naps: parseInt(e.target.value) || 0 })} min="0" />
-              </div>
-              <textarea className="w-full px-3 py-2 border rounded-md" placeholder="Observações..." value={sleepForm.notes} onChange={(e) => setSleepForm({ ...sleepForm, notes: e.target.value })} rows={3} />
-              <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleSaveSleep}>
-                <Plus size={20} className="mr-2" />
-                Registrar Sono
-              </Button>
-            </Card>
-          </TabsContent>
+          <TabsContent value="symptoms" className="space-y-4 pt-4"><Card className="space-y-4 p-5"><select className="w-full rounded-2xl border border-border bg-white px-3 py-3 text-sm" value={symptomForm.symptomType} onChange={(e) => setSymptomForm({ ...symptomForm, symptomType: e.target.value })}><option value="fever">Febre</option><option value="vomit">Vômito</option><option value="diarrhea">Diarreia</option><option value="reflux">Refluxo</option><option value="constipation">Constipação</option><option value="other">Outro</option></select><div className="grid grid-cols-3 gap-2"><Button variant={symptomForm.intensity === 'mild' ? 'default' : 'outline'} onClick={() => setSymptomForm({ ...symptomForm, intensity: 'mild' })}>Leve</Button><Button variant={symptomForm.intensity === 'moderate' ? 'default' : 'outline'} onClick={() => setSymptomForm({ ...symptomForm, intensity: 'moderate' })}>Moderado</Button><Button variant={symptomForm.intensity === 'severe' ? 'default' : 'outline'} onClick={() => setSymptomForm({ ...symptomForm, intensity: 'severe' })}>Grave</Button></div><Input placeholder="Observações e contexto..." value={symptomForm.notes} onChange={(e) => setSymptomForm({ ...symptomForm, notes: e.target.value })} /><Button className="w-full rounded-2xl py-6" onClick={saveSymptom}>Salvar sintoma</Button></Card><Card className="border-amber-200 bg-[#FFF8EA] p-4 text-sm text-[#8B5D1E]">Sangue nas fezes, vômitos persistentes, sinais de desidratação, febre persistente ou piora do estado geral exigem avaliação médica.</Card></TabsContent>
 
-          {/* Sintomas */}
-          <TabsContent value="symptoms" className="space-y-4">
-            <Card className="p-4 space-y-4">
-              <select className="w-full px-3 py-2 border rounded-md" value={symptomForm.type} onChange={(e) => setSymptomForm({ ...symptomForm, type: e.target.value })}>
-                <option value="fever">Febre</option>
-                <option value="cough">Tosse</option>
-                <option value="diarrhea">Diarreia</option>
-                <option value="vomiting">Vômito</option>
-                <option value="rash">Erupção</option>
-                <option value="other">Outro</option>
-              </select>
-              <select className="w-full px-3 py-2 border rounded-md" value={symptomForm.severity} onChange={(e) => setSymptomForm({ ...symptomForm, severity: e.target.value as any })}>
-                <option value="mild">Leve</option>
-                <option value="moderate">Moderado</option>
-                <option value="severe">Grave</option>
-              </select>
-              <textarea className="w-full px-3 py-2 border rounded-md" placeholder="Descreva o sintoma..." value={symptomForm.notes} onChange={(e) => setSymptomForm({ ...symptomForm, notes: e.target.value })} rows={3} />
-              <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleSaveSymptom}>
-                <Plus size={20} className="mr-2" />
-                Registrar Sintoma
-              </Button>
-            </Card>
-          </TabsContent>
+          <TabsContent value="digestive" className="space-y-4 pt-4"><Card className="p-5"><Utensils className="mb-3 text-secondary" /><h2 className="font-black text-[#3D2C22]">Saúde digestiva</h2><p className="mt-1 text-sm text-muted-foreground">Use sintomas e notas para organizar evacuações, refluxo, dor abdominal, seletividade alimentar e alimentos associados.</p><Button className="mt-4 w-full rounded-2xl" onClick={() => setActiveTab('symptoms')}>Registrar sintoma gastro</Button></Card></TabsContent>
 
-          {/* Saúde Digestiva */}
-          <TabsContent value="digestive" className="space-y-4">
-            <Card className="p-4 bg-secondary/5">
-              <h3 className="font-semibold mb-4">Saúde Digestiva</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Use esta área para acompanhar a saúde digestiva e preparar a consulta.
-              </p>
-              <Button className="w-full bg-secondary hover:bg-secondary/90">
-                Preparar Consulta de Saúde Digestiva
-              </Button>
-            </Card>
-          </TabsContent>
-
-          {/* Observações */}
-          <TabsContent value="notes" className="space-y-4">
-            <Card className="p-4 space-y-4">
-              <textarea placeholder="Escreva uma observação..." className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={4} />
-              <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleSaveNote}>
-                <Plus size={20} className="mr-2" />
-                Salvar Observação
-              </Button>
-              {notes.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Observações Recentes</h4>
-                  {notes.slice(-5).map((note) => (
-                    <Card key={note.id} className="p-3 mb-2">
-                      <p className="text-xs text-muted-foreground mb-1">{formatDate(note.date)}</p>
-                      <p className="text-sm">{note.content}</p>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </TabsContent>
+          <TabsContent value="notes" className="space-y-4 pt-4"><Card className="space-y-4 p-5"><textarea className="min-h-28 w-full rounded-2xl border border-border px-3 py-2 text-sm" placeholder="Dúvidas, comportamento, alimentação ou algo para lembrar na consulta..." value={noteText} onChange={(e) => setNoteText(e.target.value)} /><Button className="w-full rounded-2xl py-6" onClick={saveNote}>Salvar observação</Button></Card><LastList title="Últimas observações" items={notes.slice(0, 3).map((item) => ({ time: formatClock(item.date), title: 'Observação', detail: item.content }))} /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>
   );
+}
+
+function LastList({ title, items }: { title: string; items: { time: string; title: string; detail: string }[] }) {
+  return <Card className="p-4"><h3 className="font-black text-[#3D2C22]">{title}</h3>{items.length ? <div className="mt-3 space-y-3">{items.map((item, index) => <div key={`${item.time}-${index}`} className="flex gap-3"><span className="h-fit rounded-full bg-[#F5F0EC] px-3 py-1 text-xs font-bold text-[#8B7264]">{item.time}</span><div><p className="font-bold text-[#3D2C22]">{item.title}</p><p className="text-sm text-muted-foreground">{item.detail}</p></div></div>)}</div> : <p className="mt-2 text-sm text-muted-foreground">Nenhum registro ainda.</p>}</Card>;
 }
