@@ -9,22 +9,25 @@ import { AlertCircle, Baby, Download, Info, Plus, Ruler, Sparkles, TrendingUp } 
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import * as storage from '@/lib/storage';
 import type { GrowthRecord } from '@shared/types';
+import {
+  Z_SCORE_LINES,
+  calculateAgeInMonths,
+  calculateBMI,
+  getCautiousClassification,
+  getGrowthCurveDefinition,
+  getGrowthMetricUnit,
+  getMeasuredValue,
+  getStature,
+  getZScoreDataKey,
+  type GrowthMetric,
+} from '@/lib/growthCurves';
 
-const demoRecords = [
-  { date: 'Jan', weight: 4.2, length: 54, headCircumference: 37 },
-  { date: 'Fev', weight: 5.1, length: 57, headCircumference: 38.5 },
-  { date: 'Mar', weight: 5.9, length: 61, headCircumference: 40 },
-  { date: 'Abr', weight: 6.6, length: 64, headCircumference: 41.2 },
+const metricOptions: { key: GrowthMetric; label: string; help: string }[] = [
+  { key: 'weight', label: 'Peso', help: 'Peso para idade' },
+  { key: 'stature', label: 'Estatura', help: 'Comprimento/estatura para idade' },
+  { key: 'bmi', label: 'IMC', help: 'IMC para idade' },
+  { key: 'headCircumference', label: 'Perímetro cefálico', help: 'Principalmente de 0 a 2 anos' },
 ];
-
-const metricOptions = [
-  { key: 'weight', label: 'Peso', suffix: 'kg' },
-  { key: 'length', label: 'Comprimento', suffix: 'cm' },
-  { key: 'height', label: 'Altura', suffix: 'cm' },
-  { key: 'headCircumference', label: 'Perímetro', suffix: 'cm' },
-] as const;
-
-type Metric = (typeof metricOptions)[number]['key'];
 
 function chipClass(active: boolean) {
   return active ? 'bg-[#FCEAE5] text-[#C96B56] shadow-sm' : 'bg-[#F5F0EC] text-[#8B7264]';
@@ -34,18 +37,31 @@ function formatDate(timestamp: number) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(timestamp));
 }
 
+function inputClass() {
+  return 'h-12 rounded-2xl border-[#E9D8CF] bg-white text-[#3D2C22] placeholder:text-[#B8A79E] focus-visible:ring-primary/40';
+}
+
+function parseDecimal(value: string) {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function toISODate(timestamp: number) {
+  return new Date(timestamp).toISOString().split('T')[0];
+}
+
 export default function Growth() {
   const { activeChild } = useActiveChild();
   const { addNotification } = useNotification();
   const [records, setRecords] = useState<GrowthRecord[]>([]);
-  const [selectedMetric, setSelectedMetric] = useState<Metric>('weight');
+  const [selectedMetric, setSelectedMetric] = useState<GrowthMetric>('weight');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
+    measurementDate: '',
     weight: '',
-    length: '',
-    height: '',
+    stature: '',
     headCircumference: '',
-    position: 'lying' as 'lying' | 'standing',
     location: 'home' as 'home' | 'consultation' | 'vaccine' | 'other',
     notes: '',
   });
@@ -61,9 +77,25 @@ export default function Growth() {
     setRecords(data.sort((a, b) => a.date - b.date));
   };
 
+  const activeAgeMonths = activeChild ? calculateAgeInMonths(activeChild.dateOfBirth, Date.now()) : 0;
+  const curveDefinition = activeChild ? getGrowthCurveDefinition(activeChild.sex, selectedMetric, activeAgeMonths) : undefined;
+  const currentMetric = metricOptions.find((item) => item.key === selectedMetric)!;
+  const currentUnit = getGrowthMetricUnit(selectedMetric);
+
   const handleSaveRecord = async () => {
     if (!activeChild) return;
-    if (!formData.weight && !formData.length && !formData.height && !formData.headCircumference) {
+    if (!formData.measurementDate) {
+      alert('Informe a data da medição.');
+      return;
+    }
+
+    const measurementDate = new Date(`${formData.measurementDate}T12:00:00`).getTime();
+    const ageAtMeasurement = calculateAgeInMonths(activeChild.dateOfBirth, measurementDate);
+    const weight = parseDecimal(formData.weight);
+    const stature = parseDecimal(formData.stature);
+    const headCircumference = parseDecimal(formData.headCircumference);
+
+    if (!weight && !stature && !headCircumference) {
       alert('Preencha pelo menos uma medida.');
       return;
     }
@@ -71,12 +103,12 @@ export default function Growth() {
     const record: GrowthRecord = {
       id: `growth-${Date.now()}`,
       childId: activeChild.id,
-      date: new Date().setHours(0, 0, 0, 0),
-      weight: formData.weight ? Number(formData.weight) : undefined,
-      length: formData.length ? Number(formData.length) : undefined,
-      height: formData.height ? Number(formData.height) : undefined,
-      headCircumference: formData.headCircumference ? Number(formData.headCircumference) : undefined,
-      position: formData.position,
+      date: measurementDate,
+      weight,
+      length: ageAtMeasurement <= 24 ? stature : undefined,
+      height: ageAtMeasurement > 24 ? stature : undefined,
+      headCircumference,
+      position: ageAtMeasurement <= 24 ? 'lying' : 'standing',
       location: formData.location,
       notes: formData.notes,
       createdAt: Date.now(),
@@ -86,26 +118,67 @@ export default function Growth() {
     await storage.addGrowthRecord(record);
     await loadRecords();
     setShowForm(false);
-    setFormData({ weight: '', length: '', height: '', headCircumference: '', position: 'lying', location: 'home', notes: '' });
+    setFormData({ measurementDate: '', weight: '', stature: '', headCircumference: '', location: 'home', notes: '' });
     addNotification({ type: 'success', title: '✓ Medida registrada', message: 'Registro salvo neste dispositivo.', duration: 3500 });
   };
 
   const handleExport = () => {
     if (!activeChild || records.length === 0) return;
-    const text = [`Resumo de crescimento — ${activeChild.name}`, ...records.map((r) => `${new Date(r.date).toLocaleDateString('pt-BR')}: peso ${r.weight ?? '-'} kg · comprimento ${r.length ?? r.height ?? '-'} cm · PC ${r.headCircumference ?? '-'} cm`)].join('\n');
+    const text = [
+      `Resumo de crescimento — ${activeChild.name}`,
+      `Sexo: ${activeChild.sex === 'female' ? 'menina' : 'menino'}`,
+      ...records.map((r) => {
+        const stature = getStature(r);
+        const bmi = calculateBMI(r.weight, stature);
+        return `${new Date(r.date).toLocaleDateString('pt-BR')}: peso ${r.weight ?? '-'} kg · estatura ${stature ?? '-'} cm · IMC ${bmi ?? '-'} · perímetro cefálico ${r.headCircumference ?? '-'} cm`;
+      }),
+    ].join('\n');
     navigator.clipboard?.writeText(text);
     addNotification({ type: 'success', title: 'Resumo copiado', message: 'Cole no WhatsApp ou leve para a consulta.', duration: 3500 });
   };
 
-  const currentOption = metricOptions.find((item) => item.key === selectedMetric)!;
   const chartData = useMemo(() => {
-    if (!records.length) return demoRecords.map((item) => ({ date: item.date, value: item[selectedMetric as keyof typeof item] as number }));
-    return records
-      .filter((record) => record[selectedMetric])
-      .map((record) => ({ date: formatDate(record.date), value: record[selectedMetric] as number }));
-  }, [records, selectedMetric]);
+    if (!activeChild) return [];
+
+    const officialRows = curveDefinition?.points.map((point) => ({
+      ageMonths: point.ageMonths,
+      label: `${point.ageMonths}m`,
+      zMinus3: point.zMinus3,
+      zMinus2: point.zMinus2,
+      zMinus1: point.zMinus1,
+      z0: point.z0,
+      zPlus1: point.zPlus1,
+      zPlus2: point.zPlus2,
+      zPlus3: point.zPlus3,
+    })) ?? [];
+
+    const userRows = records
+      .map((record) => {
+        const value = getMeasuredValue(record, selectedMetric);
+        if (!value) return null;
+        const ageMonths = calculateAgeInMonths(activeChild.dateOfBirth, record.date);
+        return {
+          ageMonths,
+          label: `${ageMonths}m`,
+          userValue: value,
+          userDate: formatDate(record.date),
+          userAge: `${ageMonths} meses`,
+          classification: curveDefinition?.hasOfficialDataset ? 'Acompanhe com o pediatra para interpretação adequada.' : getCautiousClassification(),
+        };
+      })
+      .filter(Boolean) as any[];
+
+    if (!officialRows.length) return userRows;
+
+    const byAge = new Map<number, any>();
+    officialRows.forEach((row) => byAge.set(row.ageMonths, row));
+    userRows.forEach((row) => byAge.set(row.ageMonths, { ...(byAge.get(row.ageMonths) ?? { ageMonths: row.ageMonths, label: `${row.ageMonths}m` }), ...row }));
+    return Array.from(byAge.values()).sort((a, b) => a.ageMonths - b.ageMonths);
+  }, [activeChild, curveDefinition, records, selectedMetric]);
 
   const latest = records[records.length - 1];
+  const latestStature = latest ? getStature(latest) : undefined;
+  const latestBmi = latest ? calculateBMI(latest.weight, latestStature) : undefined;
 
   return (
     <AppLayout>
@@ -113,27 +186,21 @@ export default function Growth() {
         <section className="glass-card overflow-hidden">
           <div className="bg-gradient-to-br from-[#EAF5FF] via-white to-[#F7FCFE] p-5 sm:p-7">
             <span className="medical-chip">Crescimento</span>
-            <h1 className="mt-4 text-3xl font-black leading-tight text-[#3D2C22]">Acompanhe a evolução do bebê</h1>
+            <h1 className="mt-4 text-3xl font-black leading-tight text-[#3D2C22]">Acompanhe a evolução da criança</h1>
             <p className="mt-2 text-sm leading-relaxed text-[#6F5B50]">
-              Registre peso, comprimento/altura e perímetro cefálico para levar dados mais claros à consulta pediátrica.
+              Os gráficos seguem a estrutura da Caderneta da Criança: sexo, idade, peso, estatura, IMC e perímetro cefálico.
             </p>
             <div className="mt-5 grid grid-cols-3 gap-2">
-              <Card className="p-3"><p className="text-[11px] font-bold uppercase text-muted-foreground">Peso</p><p className="mt-1 text-lg font-black text-[#3D2C22]">{latest?.weight ? `${latest.weight} kg` : '5,9 kg'}</p><p className="text-[11px] text-muted-foreground">{latest ? 'último' : 'exemplo'}</p></Card>
-              <Card className="p-3"><p className="text-[11px] font-bold uppercase text-muted-foreground">Altura</p><p className="mt-1 text-lg font-black text-[#3D2C22]">{latest?.length || latest?.height ? `${latest.length ?? latest.height} cm` : '61 cm'}</p><p className="text-[11px] text-muted-foreground">{latest ? 'último' : 'exemplo'}</p></Card>
-              <Card className="p-3"><p className="text-[11px] font-bold uppercase text-muted-foreground">PC</p><p className="mt-1 text-lg font-black text-[#3D2C22]">{latest?.headCircumference ? `${latest.headCircumference} cm` : '40 cm'}</p><p className="text-[11px] text-muted-foreground">{latest ? 'último' : 'exemplo'}</p></Card>
+              <Card className="p-3"><p className="text-[11px] font-bold uppercase text-muted-foreground">Peso</p><p className="mt-1 text-lg font-black text-[#3D2C22]">{latest?.weight ? `${latest.weight} kg` : '-'}</p><p className="text-[11px] text-muted-foreground">{latest ? 'último' : 'sem dado'}</p></Card>
+              <Card className="p-3"><p className="text-[11px] font-bold uppercase text-muted-foreground">Estatura</p><p className="mt-1 text-lg font-black text-[#3D2C22]">{latestStature ? `${latestStature} cm` : '-'}</p><p className="text-[11px] text-muted-foreground">{activeAgeMonths <= 24 ? 'comprimento' : 'altura'}</p></Card>
+              <Card className="p-3"><p className="text-[11px] font-bold uppercase text-muted-foreground">Perímetro cefálico</p><p className="mt-1 text-lg font-black text-[#3D2C22]">{latest?.headCircumference ? `${latest.headCircumference} cm` : '-'}</p><p className="text-[11px] text-muted-foreground">0 a 2 anos</p></Card>
             </div>
           </div>
         </section>
 
         {!activeChild && (
           <Card className="border-amber-200 bg-[#FFF8EA] p-4">
-            <div className="flex gap-3">
-              <AlertCircle className="mt-1 shrink-0 text-amber-700" />
-              <div>
-                <h2 className="font-black text-[#3D2C22]">Exemplo demonstrativo</h2>
-                <p className="mt-1 text-sm text-[#8B7264]">Cadastre uma criança no Perfil para salvar medidas reais neste dispositivo.</p>
-              </div>
-            </div>
+            <div className="flex gap-3"><AlertCircle className="mt-1 shrink-0 text-amber-700" /><div><h2 className="font-black text-[#3D2C22]">Cadastre uma criança</h2><p className="mt-1 text-sm text-[#8B7264]">A data de nascimento e o sexo são necessários para selecionar a curva correta.</p></div></div>
           </Card>
         )}
 
@@ -148,13 +215,13 @@ export default function Growth() {
 
         {showForm && activeChild && (
           <Card className="space-y-4 p-4">
-            <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1 text-sm font-bold">Peso (kg)<Input type="number" step="0.1" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} placeholder="5.9" /></label>
-              <label className="space-y-1 text-sm font-bold">Comprimento (cm)<Input type="number" step="0.1" value={formData.length} onChange={(e) => setFormData({ ...formData, length: e.target.value })} placeholder="61" /></label>
-              <label className="space-y-1 text-sm font-bold">Altura (cm)<Input type="number" step="0.1" value={formData.height} onChange={(e) => setFormData({ ...formData, height: e.target.value })} placeholder="75" /></label>
-              <label className="space-y-1 text-sm font-bold">Perímetro (cm)<Input type="number" step="0.1" value={formData.headCircumference} onChange={(e) => setFormData({ ...formData, headCircumference: e.target.value })} placeholder="40" /></label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm font-bold text-[#3D2C22]">Data da medição<Input className={inputClass()} type="date" value={formData.measurementDate} onChange={(e) => setFormData({ ...formData, measurementDate: e.target.value })} /></label>
+              <label className="space-y-1 text-sm font-bold text-[#3D2C22]">Peso (kg)<Input className={inputClass()} inputMode="decimal" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} placeholder="Ex.: 7,2" /></label>
+              <label className="space-y-1 text-sm font-bold text-[#3D2C22]">Estatura (cm)<Input className={inputClass()} inputMode="decimal" value={formData.stature} onChange={(e) => setFormData({ ...formData, stature: e.target.value })} placeholder="Ex.: 65" /></label>
+              <label className="space-y-1 text-sm font-bold text-[#3D2C22]">Perímetro cefálico (cm)<Input className={inputClass()} inputMode="decimal" value={formData.headCircumference} onChange={(e) => setFormData({ ...formData, headCircumference: e.target.value })} placeholder="Ex.: 42" /></label>
             </div>
-            <textarea className="min-h-20 w-full rounded-2xl border border-border bg-white px-3 py-2 text-sm" placeholder="Observações para a consulta..." value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
+            <textarea className="min-h-20 w-full rounded-2xl border border-[#E9D8CF] bg-white px-3 py-2 text-sm text-[#3D2C22] placeholder:text-[#B8A79E]" placeholder="Observações para a consulta..." value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
             <Button className="w-full rounded-2xl py-6" onClick={handleSaveRecord}>Salvar medida</Button>
           </Card>
         )}
@@ -167,32 +234,50 @@ export default function Growth() {
               </button>
             ))}
           </div>
+
           <Card className="p-4">
-            <div className="mb-3 flex items-center justify-between"><div><p className="subtle-label">Evolução</p><h2 className="font-black text-[#3D2C22]">{currentOption.label}</h2></div><TrendingUp className="text-accent" /></div>
-            <ResponsiveContainer width="100%" height={230}>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="subtle-label">Curva selecionada</p><h2 className="font-black text-[#3D2C22]">{curveDefinition?.label ?? currentMetric.help}</h2><p className="mt-1 text-xs text-muted-foreground">{activeChild ? `${activeChild.sex === 'female' ? 'Menina' : 'Menino'} · ${curveDefinition?.ageRange ?? '-'} anos` : 'Cadastre a criança para selecionar por sexo e idade.'}</p></div>
+              <TrendingUp className="text-accent" />
+            </div>
+
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {Z_SCORE_LINES.map((z) => <span key={z} className="rounded-full bg-[#F5F0EC] px-2.5 py-1 text-[11px] font-bold text-[#8B7264]">z {z > 0 ? `+${z}` : z}</span>)}
+            </div>
+
+            <ResponsiveContainer width="100%" height={260}>
               <LineChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="ageMonths" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} label={{ value: 'idade (meses)', position: 'insideBottom', offset: -2, fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value: any) => [`${Number(value).toFixed(1)} ${currentOption.suffix}`, currentOption.label]} />
-                <Line type="monotone" dataKey="value" stroke="#A8D4E6" strokeWidth={3} dot={{ fill: '#F0A48F', r: 5 }} activeDot={{ r: 7 }} />
+                <Tooltip content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const row: any = payload[0].payload;
+                  return <div className="rounded-2xl border border-border bg-white p-3 text-xs shadow-lg"><p className="font-black text-[#3D2C22]">{row.userDate ? 'Medição da criança' : 'Linha de referência'}</p><p>Idade: {row.userAge ?? `${row.ageMonths} meses`}</p>{row.userValue && <p>Valor: {Number(row.userValue).toFixed(1)} {currentUnit}</p>}<p className="mt-1 text-muted-foreground">{row.classification ?? 'Escore-z de referência.'}</p></div>;
+                }} />
+                {curveDefinition?.hasOfficialDataset && Z_SCORE_LINES.map((z) => <Line key={z} type="monotone" dataKey={getZScoreDataKey(z)} stroke={z === 0 ? '#C96B56' : '#C8B8AF'} strokeWidth={z === 0 ? 2.5 : 1.4} dot={false} connectNulls />)}
+                <Line type="monotone" dataKey="userValue" name="Criança" stroke="#F0A48F" strokeWidth={0} dot={{ fill: '#F0A48F', r: 6, strokeWidth: 2, stroke: '#FFFFFF' }} activeDot={{ r: 8 }} />
               </LineChart>
             </ResponsiveContainer>
-            {!records.length && <p className="mt-2 text-center text-xs text-muted-foreground">Gráfico demonstrativo. Os dados reais aparecerão após o cadastro das medidas.</p>}
+
+            {!curveDefinition?.hasOfficialDataset && <p className="mt-3 rounded-2xl bg-[#FFF8EA] p-3 text-xs leading-relaxed text-[#8B5D1E]">Estrutura preparada para as curvas OMS/Caderneta, com linhas z -3 a +3. Os datasets oficiais ainda precisam ser inseridos em <code>client/src/lib/growthCurves.ts</code>; por segurança, o app não inventa curvas falsas.</p>}
+            {records.length === 0 && <p className="mt-2 text-center text-xs text-muted-foreground">Os pontos da criança aparecerão depois que você salvar uma medição real.</p>}
           </Card>
         </section>
 
         <section className="grid gap-3 md:grid-cols-3">
-          <Card className="p-4"><Baby className="mb-2 text-primary" /><h3 className="font-black text-[#3D2C22]">Como usar</h3><p className="mt-1 text-sm text-muted-foreground">Registre medidas após consultas ou pesagens confiáveis para comparar a evolução.</p></Card>
-          <Card className="p-4"><Info className="mb-2 text-accent" /><h3 className="font-black text-[#3D2C22]">Atenção</h3><p className="mt-1 text-sm text-muted-foreground">O app mostra tendência individual. Percentis e interpretação devem ser feitos pela pediatra.</p></Card>
-          <Card className="p-4"><Sparkles className="mb-2 text-secondary" /><h3 className="font-black text-[#3D2C22]">Leve à consulta</h3><p className="mt-1 text-sm text-muted-foreground">Use o resumo para contar melhor a história de crescimento da criança.</p></Card>
+          <Card className="p-4"><Baby className="mb-2 text-primary" /><h3 className="font-black text-[#3D2C22]">Como usar</h3><p className="mt-1 text-sm text-muted-foreground">Cadastre sexo e nascimento, registre medidas reais e acompanhe os pontos no gráfico.</p></Card>
+          <Card className="p-4"><Info className="mb-2 text-accent" /><h3 className="font-black text-[#3D2C22]">Atenção</h3><p className="mt-1 text-sm text-muted-foreground">Os gráficos são ferramentas de acompanhamento e não substituem consulta pediátrica.</p></Card>
+          <Card className="p-4"><Sparkles className="mb-2 text-secondary" /><h3 className="font-black text-[#3D2C22]">Caderneta</h3><p className="mt-1 text-sm text-muted-foreground">A referência segue a lógica da Caderneta da Criança: curvas por sexo, idade e tipo de medida.</p></Card>
         </section>
 
         {records.length > 0 && (
           <section className="space-y-3">
             <h2 className="section-title">Últimos registros</h2>
-            {records.slice(-5).reverse().map((record) => (
-              <Card key={record.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-[#3D2C22]">{new Date(record.date).toLocaleDateString('pt-BR')}</p><p className="mt-1 text-sm text-muted-foreground">Peso {record.weight ?? '-'} kg · Comprimento {record.length ?? record.height ?? '-'} cm · PC {record.headCircumference ?? '-'} cm</p>{record.notes && <p className="mt-2 text-xs italic text-muted-foreground">{record.notes}</p>}</div><Ruler className="shrink-0 text-accent" /></div></Card>
-            ))}
+            {records.slice(-5).reverse().map((record) => {
+              const stature = getStature(record);
+              const bmi = calculateBMI(record.weight, stature);
+              return <Card key={record.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-[#3D2C22]">{new Date(record.date).toLocaleDateString('pt-BR')}</p><p className="mt-1 text-sm text-muted-foreground">Peso {record.weight ?? '-'} kg · Estatura {stature ?? '-'} cm · IMC {bmi ?? '-'} · Perímetro cefálico {record.headCircumference ?? '-'} cm</p>{record.notes && <p className="mt-2 text-xs italic text-muted-foreground">{record.notes}</p>}</div><Ruler className="shrink-0 text-accent" /></div></Card>;
+            })}
           </section>
         )}
       </div>
