@@ -165,22 +165,40 @@ export default function Today() {
             </div>
           </section>
 
-          <section className="grid gap-3 md:grid-cols-3">
-            <Card className="p-4">
-              <Stethoscope className="mb-2 text-primary" />
-              <h3 className="font-bold">Pediatria com acolhimento</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Conteúdo educativo e acompanhamento para a rotina da família.</p>
-            </Card>
-            <Card className="p-4">
-              <Ruler className="mb-2 text-accent" />
-              <h3 className="font-bold">Crescimento e diário</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Registre medidas, mamadas, fraldas, sono e sintomas.</p>
-            </Card>
-            <Card className="p-4">
-              <Download className="mb-2 text-secondary" />
-              <h3 className="font-bold">Materiais gratuitos</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Cadernetas, BLW, introdução alimentar, sono e desenvolvimento.</p>
-            </Card>
+          <section className="grid gap-3 md:grid-cols-3" aria-label="Acessos principais do app">
+            <button
+              type="button"
+              onClick={() => navigate('/content?tab=faq')}
+              className="group rounded-[1.35rem] border border-[#F4D7CF] bg-white p-4 text-left shadow-[0_12px_28px_rgba(61,44,34,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-[#FFFAF7] hover:shadow-[0_16px_36px_rgba(61,44,34,0.10)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-label="Abrir conteúdos sobre pediatria e cuidados"
+            >
+              <Stethoscope className="mb-2 text-primary transition group-hover:scale-110" />
+              <h3 className="font-extrabold text-[#3D2C22]">Pediatria com acolhimento</h3>
+              <p className="mt-1 text-sm text-[#8B7264]">Conteúdo educativo e acompanhamento para a rotina da família.</p>
+              <span className="mt-3 inline-flex items-center text-xs font-bold text-primary">Conhecer cuidados <ChevronRight className="ml-1 size-3" /></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/growth')}
+              className="group rounded-[1.35rem] border border-[#D7EEF7] bg-white p-4 text-left shadow-[0_12px_28px_rgba(61,44,34,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:bg-[#F7FCFE] hover:shadow-[0_16px_36px_rgba(61,44,34,0.10)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              aria-label="Abrir crescimento e diário do bebê"
+            >
+              <Ruler className="mb-2 text-accent transition group-hover:scale-110" />
+              <h3 className="font-extrabold text-[#3D2C22]">Crescimento e diário</h3>
+              <p className="mt-1 text-sm text-[#8B7264]">Registre medidas, mamadas, fraldas, sono e sintomas.</p>
+              <span className="mt-3 inline-flex items-center text-xs font-bold text-accent">Acompanhar bebê <ChevronRight className="ml-1 size-3" /></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/content?tab=materials')}
+              className="group rounded-[1.35rem] border border-[#DDF1E5] bg-white p-4 text-left shadow-[0_12px_28px_rgba(61,44,34,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-secondary/50 hover:bg-[#F6FCF8] hover:shadow-[0_16px_36px_rgba(61,44,34,0.10)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40"
+              aria-label="Abrir materiais gratuitos"
+            >
+              <Download className="mb-2 text-secondary transition group-hover:scale-110" />
+              <h3 className="font-extrabold text-[#3D2C22]">Materiais gratuitos</h3>
+              <p className="mt-1 text-sm text-[#8B7264]">Cadernetas, BLW, introdução alimentar, sono e desenvolvimento.</p>
+              <span className="mt-3 inline-flex items-center text-xs font-bold text-secondary">Ver materiais <ChevronRight className="ml-1 size-3" /></span>
+            </button>
           </section>
         </div>
       </AppLayout>
