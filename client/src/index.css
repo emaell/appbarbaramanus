@@ -43,85 +43,83 @@
 }
 
 :root {
-  /* Cores principais - Tons suaves para Cuidar com Dra. Barbara */
-  --primary: oklch(0.69 0.13 345); /* Rosa profissional */
-  --primary-foreground: oklch(0.2 0.01 0);
-  --sidebar-primary: oklch(0.75 0.15 340);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  
-  --secondary: oklch(0.67 0.10 150); /* Verde Instituto */
-  --secondary-foreground: oklch(0.2 0.01 0);
-  
-  --accent: oklch(0.72 0.10 225); /* Azul suave */
-  --accent-foreground: oklch(0.2 0.01 0);
-  
-  --chart-1: oklch(0.75 0.15 340);
-  --chart-2: oklch(0.72 0.12 150);
-  --chart-3: oklch(0.75 0.12 230);
-  --chart-4: oklch(0.7 0.1 50);
-  --chart-5: oklch(0.68 0.08 280);
-  
-  --radius: 1.1rem;
-  --background: oklch(0.985 0.012 30); /* off-white acolhedor */
-  --foreground: oklch(0.2 0.01 0); /* Escuro */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.01 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.01 0);
-  --muted: oklch(0.96 0.018 45); /* Bege suave */
-  --muted-foreground: oklch(0.5 0.01 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.95 0.01 50);
-  --input: oklch(1 0 0);
-  --ring: oklch(0.75 0.15 340);
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.2 0.01 0);
-  --sidebar-accent: oklch(0.97 0.01 50);
-  --sidebar-accent-foreground: oklch(0.2 0.01 0);
-  --sidebar-border: oklch(0.95 0.01 50);
-  --sidebar-ring: oklch(0.75 0.15 340);
+  /* Paleta Cuidar com Dra. Bárbara — quente, suave e pediátrica */
+  --primary: #F0A48F;
+  --primary-foreground: #FFFFFF;
+  --sidebar-primary: #F0A48F;
+  --sidebar-primary-foreground: #FFFFFF;
+
+  --secondary: #A7D8B8;
+  --secondary-foreground: #3D2C22;
+
+  --accent: #A8D4E6;
+  --accent-foreground: #3D2C22;
+
+  --chart-1: #F0A48F;
+  --chart-2: #A7D8B8;
+  --chart-3: #A8D4E6;
+  --chart-4: #F5CF85;
+  --chart-5: #C7B0E2;
+
+  --radius: 1.15rem;
+  --background: #FFFAF7;
+  --foreground: #3D2C22;
+  --card: #FFFFFF;
+  --card-foreground: #3D2C22;
+  --popover: #FFFFFF;
+  --popover-foreground: #3D2C22;
+  --muted: #F5F0EC;
+  --muted-foreground: #8B7264;
+  --destructive: #D65A4A;
+  --destructive-foreground: #FFFFFF;
+  --border: #F1E5DD;
+  --input: #FFFFFF;
+  --ring: #F0A48F;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #3D2C22;
+  --sidebar-accent: #F5F0EC;
+  --sidebar-accent-foreground: #3D2C22;
+  --sidebar-border: #F1E5DD;
+  --sidebar-ring: #F0A48F;
 }
 
 .dark {
-  /* Modo noturno discreto - Tons suaves mantidos */
-  --primary: oklch(0.75 0.15 340); /* Rosa mantém tom suave */
-  --primary-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.75 0.15 340);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  
-  --secondary: oklch(0.72 0.12 150);
-  --secondary-foreground: oklch(0.98 0 0);
-  
-  --accent: oklch(0.75 0.12 230);
-  --accent-foreground: oklch(0.98 0 0);
-  
-  --chart-1: oklch(0.75 0.15 340);
-  --chart-2: oklch(0.72 0.12 150);
-  --chart-3: oklch(0.75 0.12 230);
-  --chart-4: oklch(0.7 0.1 50);
-  --chart-5: oklch(0.68 0.08 280);
-  
-  --background: oklch(0.15 0.01 280); /* Cinza muito escuro */
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.22 0.01 280);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.22 0.01 280);
-  --popover-foreground: oklch(0.95 0 0);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.3 0.01 280);
-  --muted-foreground: oklch(0.7 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.3 0.01 280);
-  --input: oklch(0.25 0.01 280);
-  --ring: oklch(0.75 0.15 340);
-  --sidebar: oklch(0.22 0.01 280);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-accent: oklch(0.3 0.01 280);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.3 0.01 280);
-  --sidebar-ring: oklch(0.75 0.15 340);
+  --primary: #F0A48F;
+  --primary-foreground: #FFFFFF;
+  --sidebar-primary: #F0A48F;
+  --sidebar-primary-foreground: #FFFFFF;
+
+  --secondary: #A7D8B8;
+  --secondary-foreground: #1A1410;
+
+  --accent: #A8D4E6;
+  --accent-foreground: #1A1410;
+
+  --chart-1: #F0A48F;
+  --chart-2: #A7D8B8;
+  --chart-3: #A8D4E6;
+  --chart-4: #F5CF85;
+  --chart-5: #C7B0E2;
+
+  --background: #1A1410;
+  --foreground: #FFF7F1;
+  --card: #241C17;
+  --card-foreground: #FFF7F1;
+  --popover: #241C17;
+  --popover-foreground: #FFF7F1;
+  --muted: #332821;
+  --muted-foreground: #D8C7BA;
+  --destructive: #F06B5D;
+  --destructive-foreground: #FFFFFF;
+  --border: #3A2E27;
+  --input: #2B211B;
+  --ring: #F0A48F;
+  --sidebar: #241C17;
+  --sidebar-foreground: #FFF7F1;
+  --sidebar-accent: #332821;
+  --sidebar-accent-foreground: #FFF7F1;
+  --sidebar-border: #3A2E27;
+  --sidebar-ring: #F0A48F;
 }
 
 @layer base {
@@ -130,8 +128,10 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Nunito", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -147,24 +147,11 @@
 }
 
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -175,35 +162,35 @@
 
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
   }
 }
 
 @layer utilities {
   .glass-card {
-    @apply rounded-[1.75rem] border border-white/70 bg-white/82 shadow-[0_18px_45px_rgba(69,45,56,0.08)] backdrop-blur-md;
+    @apply rounded-[1.75rem] border border-white/75 bg-white/88 shadow-[0_18px_45px_rgba(61,44,34,0.07)] backdrop-blur-md;
   }
   .soft-card {
-    @apply rounded-[1.5rem] border border-border/70 bg-card shadow-sm;
+    @apply rounded-[1.5rem] border border-border/80 bg-card shadow-[0_10px_28px_rgba(61,44,34,0.05)];
   }
   .section-title {
-    @apply text-xl font-bold tracking-tight text-foreground;
+    @apply text-xl font-extrabold tracking-tight text-foreground;
   }
   .subtle-label {
     @apply text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground;
   }
   .medical-chip {
-    @apply rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary;
+    @apply rounded-full border border-[#F4C9BE] bg-[#FCEAE5] px-3 py-1 text-xs font-bold text-[#C96B56];
   }
   .line-clamp-2 {
     display: -webkit-box;
