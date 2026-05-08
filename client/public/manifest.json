@@ -1,0 +1,27 @@
+{
+  "name": "Cuidar com Dra. Bárbara",
+  "short_name": "Cuidar",
+  "description": "Diário do bebê, crescimento, amamentação, vacinas e materiais pediátricos gratuitos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#E8B4C8",
+  "background_color": "#FFF8FB",
+  "lang": "pt-BR",
+  "categories": ["health", "education", "lifestyle"],
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
